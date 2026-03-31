@@ -1,0 +1,109 @@
+<div class="dashboard">
+
+  <!-- ── HEADER ── -->
+  <header class="header">
+    <span class="header-title">Solar Dashboard</span>
+  </header>
+
+  <div class="page-content">
+
+    <!-- ── CONTROLS CARD ── -->
+    <div class="card controls-card">
+      <span class="card-label">Date Range</span>
+      <div class="controls-row">
+        <div class="controls-group">
+          <label class="field-label">FROM</label>
+          <input class="date-input" type="datetime-local" [(ngModel)]="fromDate" />
+        </div>
+        <span class="controls-separator">→</span>
+        <div class="controls-group">
+          <label class="field-label">TO</label>
+          <input class="date-input" type="datetime-local" [(ngModel)]="toDate" />
+        </div>
+        <button class="fetch-btn" (click)="fetch()" [disabled]="loading()">
+          <span *ngIf="!loading()">Fetch</span>
+          <span *ngIf="loading()" class="loading-text">Loading<span class="dots">...</span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── ERROR ── -->
+    <div class="error-banner" *ngIf="error()">
+      <span class="error-icon">✕</span> {{ error() }}
+    </div>
+
+    <!-- ── STAT CARDS ── -->
+    <div class="stats-row" *ngIf="stats()">
+
+      <div class="stat-card accent-amber">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-body">
+          <div class="stat-label">Current</div>
+          <div class="stat-value">
+            <span *ngIf="stats()!.current !== null">{{ stats()!.current!.toFixed(2) }}</span>
+            <span *ngIf="stats()!.current === null" class="stat-na">N/A</span>
+            <span class="stat-unit" *ngIf="stats()!.current !== null">EUR/MWh</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card accent-blue">
+        <div class="stat-icon">≈</div>
+        <div class="stat-body">
+          <div class="stat-label">Average</div>
+          <div class="stat-value">{{ stats()!.avg.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
+        </div>
+      </div>
+
+      <div class="stat-card accent-green">
+        <div class="stat-icon">↓</div>
+        <div class="stat-body">
+          <div class="stat-label">Min</div>
+          <div class="stat-value">{{ stats()!.min.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
+        </div>
+      </div>
+
+      <div class="stat-card accent-red">
+        <div class="stat-icon">↑</div>
+        <div class="stat-body">
+          <div class="stat-label">Max</div>
+          <div class="stat-value">{{ stats()!.max.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
+        </div>
+      </div>
+
+      <div class="stat-card accent-cyan">
+        <div class="stat-icon">#</div>
+        <div class="stat-body">
+          <div class="stat-label">Data Points</div>
+          <div class="stat-value">{{ prices().length }} <span class="stat-unit">intervals</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── CHART CARD ── -->
+    <div class="card chart-card" *ngIf="prices().length">
+      <div class="chart-card-header">
+        <span class="chart-title">Day-Ahead Price Curve</span>
+        <span class="chart-resolution">{{ prices()[0]?.resolution }}</span>
+      </div>
+      <app-price-chart [prices]="prices()" />
+    </div>
+
+    <!-- ── EMPTY STATE ── -->
+    <div class="empty-state" *ngIf="!prices().length && !loading() && !error()">
+      <div class="empty-icon">◈</div>
+      <div class="empty-text">Select a date range and fetch prices</div>
+      <div class="empty-sub">Data sourced from ENTSO-E Transparency Platform</div>
+    </div>
+
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer class="footer">
+    <span>Data · <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a></span>
+    <span>Resolution: PT15M / PT60M</span>
+    <span>Currency: EUR/MWh</span>
+  </footer>
+
+</div>
