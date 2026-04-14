@@ -181,8 +181,8 @@ export class PriceChartComponent implements AfterViewInit, OnChanges, OnDestroy 
     solarGradient.addColorStop(0.6, 'rgba(0, 153, 187, 0.04)');
     solarGradient.addColorStop(1,   'rgba(0, 153, 187, 0)');
 
+    // All 288 × 15-min points — no downsampling needed, Chart.js time scale handles it
     const solarPoints = this.solarForecast
-      .filter((_, i) => i % 4 === 0)   // one point per hour
       .map(p => ({ x: p.ts, y: p.inverterAcPower }));
 
     this.chart.data.datasets = [

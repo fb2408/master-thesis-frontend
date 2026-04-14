@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
@@ -14,56 +14,63 @@ import { PriceChartComponent } from './components/price-chart/price-chart.compon
   standalone: true,
   imports: [CommonModule, FormsModule, PriceChartComponent],
   templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss'
+  styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
   private readonly priceService = inject(EnergyPricesService);
   private readonly solarService = inject(SolarForecastService);
 
   // ── Price state ──────────────────────────────────────────────────────────
-  prices  = signal<DayAheadPricePoint[]>([]);
+  prices = signal<DayAheadPricePoint[]>([]);
   loading = signal(false);
-  error   = signal<string | null>(null);
+  error = signal<string | null>(null);
 
   fromDate = '';
-  toDate   = '';
+  toDate = '';
 
   // ── Solar state ──────────────────────────────────────────────────────────
   solarForecast = signal<SolarForecastPoint[]>([]);
-  solarError    = signal<string | null>(null);
+  solarError = signal<string | null>(null);
 
-  solarLat        = 45.815;
-  solarLon        = 15.966;
+  solarLat = 45.815;
+  solarLon = 15.966;
   solarCapacityKw = 10.0;
-  solarTilt       = 30;
-  solarAzimuth    = 180;
-  solarEfficiency = 20;   // entered as %
-  solarLosses     = 14;   // entered as %
+  solarTilt = 30;
+  solarAzimuth = 180;
+  solarEfficiency = 20; // entered as %
+  solarLosses = 14; // entered as %
 
   // ── Derived: price stats ─────────────────────────────────────────────────
   stats = computed<PriceStats | null>(() => {
     const pts = this.prices();
     if (!pts.length) return null;
-    const vals = pts.map(p => p.price);
+    const vals = pts.map((p) => p.price);
     const now = new Date();
-    const current = pts.find(p => {
+    const current = pts.find((p) => {
       const t = new Date(p.timeStart + 'Z');
       return Math.abs(t.getTime() - now.getTime()) < 30 * 60 * 1000;
     });
     return {
-      min:      Math.min(...vals),
-      max:      Math.max(...vals),
-      avg:      vals.reduce((a, b) => a + b, 0) / vals.length,
-      current:  current?.price ?? null,
-      currency: pts[0]?.currency ?? 'EUR'
+      min: Math.min(...vals),
+      max: Math.max(...vals),
+      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+      current: current?.price ?? null,
+      currency: pts[0]?.currency ?? 'EUR',
     };
+  });
+
+  effStats = effect(() => {
+    console.log(this.stats());
+  });
+  effSolarStats = effect(() => {
+    console.log(this.solarStats());
   });
 
   // ── Derived: solar stats ─────────────────────────────────────────────────
   solarStats = computed(() => {
     const pts = this.solarForecast();
     if (!pts.length) return null;
-    const peakPower   = Math.max(...pts.map(p => p.inverterAcPower));
+    const peakPower = Math.max(...pts.map((p) => p.inverterAcPower));
     const totalEnergy = pts.reduce((s, p) => s + p.inverterAcPower * 0.25, 0);
     return { peakPower, totalEnergy, count: pts.length };
   });
@@ -72,14 +79,14 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     const { from, to } = this.initialDateRange();
     this.fromDate = this.toInputValue(from);
-    this.toDate   = this.toInputValue(to);
+    this.toDate = this.toInputValue(to);
     this.fetch();
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
   fetch(): void {
     const from = new Date(this.fromDate);
-    const to   = new Date(this.toDate);
+    const to = new Date(this.toDate);
     if (isNaN(from.getTime()) || isNaN(to.getTime()) || from >= to) {
       this.error.set('Invalid date range.');
       return;
@@ -91,18 +98,24 @@ export class DashboardComponent implements OnInit {
 
     const priceReq = this.priceService.fetchDayAheadPrices(from, to);
 
-    const solarReq = this.solarService.fetchForecast({
-      lat:        this.solarLat,
-      lon:        this.solarLon,
-      capacityKw: this.solarCapacityKw,
-      tilt:       this.solarTilt,
-      azimuth:    this.solarAzimuth,
-      efficiency: this.solarEfficiency / 100,
-      losses:     this.solarLosses     / 100,
-    }).pipe(catchError(err => {
-      this.solarError.set(err?.message ?? 'Solar forecast unavailable — is the backend running?');
-      return of([] as SolarForecastPoint[]);
-    }));
+    const solarReq = this.solarService
+      .fetchForecast({
+        lat: this.solarLat,
+        lon: this.solarLon,
+        capacityKw: this.solarCapacityKw,
+        tilt: this.solarTilt,
+        azimuth: this.solarAzimuth,
+        efficiency: this.solarEfficiency / 100,
+        losses: this.solarLosses / 100,
+      })
+      .pipe(
+        catchError((err) => {
+          this.solarError.set(
+            err?.message ?? 'Solar forecast unavailable — is the backend running?',
+          );
+          return of([] as SolarForecastPoint[]);
+        }),
+      );
 
     forkJoin({ prices: priceReq, solar: solarReq }).subscribe({
       next: ({ prices, solar }) => {
@@ -113,7 +126,7 @@ export class DashboardComponent implements OnInit {
       error: (err) => {
         this.error.set(err.message ?? 'Failed to fetch prices. Is the backend running?');
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -121,9 +134,11 @@ export class DashboardComponent implements OnInit {
   private initialDateRange(): { from: Date; to: Date } {
     const now = new Date();
     const offset = now.getUTCHours() >= 16 ? 1 : 0;
-    const utcDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset));
+    const utcDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset),
+    );
     const from = new Date(utcDay.getUTCFullYear(), utcDay.getUTCMonth(), utcDay.getUTCDate(), 0, 0);
-    const to   = new Date(utcDay.getUTCFullYear(), utcDay.getUTCMonth(), utcDay.getUTCDate(), 23, 59);
+    const to = new Date(utcDay.getUTCFullYear(), utcDay.getUTCMonth(), utcDay.getUTCDate(), 23, 59);
     return { from, to };
   }
 
