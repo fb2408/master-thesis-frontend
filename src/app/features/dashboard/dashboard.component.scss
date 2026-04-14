@@ -299,6 +299,103 @@
   color: var(--text-muted);
 }
 
+/* ── SOLAR FORM CARD ── */
+.solar-form-card {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solar-form-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.num-input {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  width: 100px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -moz-appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  &:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(0, 153, 187, 0.12);
+  }
+}
+
+.unit-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.solar-form-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+
+  code {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--cyan);
+    font-size: 10px;
+  }
+}
+
+/* ── ERROR WARN VARIANT ── */
+.error-banner--warn {
+  background: rgba(212, 135, 10, 0.06);
+  border-color: rgba(212, 135, 10, 0.25);
+  color: var(--amber);
+}
+
+/* ── CHART LEGEND ── */
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &--cyan  { background: var(--cyan); }
+  &--amber { background: var(--amber); }
+}
+
+.legend-label { white-space: nowrap; }
+
 /* ── FOOTER ── */
 .footer {
   display: flex;

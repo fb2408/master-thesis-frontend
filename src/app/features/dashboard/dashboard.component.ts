@@ -1,8 +1,12 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { EnergyPricesService } from '../../core/services/energy-prices.service';
+import { SolarForecastService } from '../../core/services/solar-forecast.service';
 import { DayAheadPricePoint, PriceStats } from '../../core/models/day-ahead-price.model';
+import { SolarForecastPoint } from '../../core/models/solar-forecast.model';
 import { PriceChartComponent } from './components/price-chart/price-chart.component';
 
 @Component({
@@ -13,22 +17,30 @@ import { PriceChartComponent } from './components/price-chart/price-chart.compon
   styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent implements OnInit {
-  private readonly service = inject(EnergyPricesService);
+  private readonly priceService = inject(EnergyPricesService);
+  private readonly solarService = inject(SolarForecastService);
 
-  prices = signal<DayAheadPricePoint[]>([]);
+  // ── Price state ──────────────────────────────────────────────────────────
+  prices  = signal<DayAheadPricePoint[]>([]);
   loading = signal(false);
-  error = signal<string | null>(null);
+  error   = signal<string | null>(null);
 
   fromDate = '';
   toDate   = '';
 
-  ngOnInit(): void {
-    const { from, to } = this.initialDateRange();
-    this.fromDate = this.toInputValue(from);
-    this.toDate   = this.toInputValue(to);
-    this.fetch();
-  }
+  // ── Solar state ──────────────────────────────────────────────────────────
+  solarForecast = signal<SolarForecastPoint[]>([]);
+  solarError    = signal<string | null>(null);
 
+  solarLat        = 45.815;
+  solarLon        = 15.966;
+  solarCapacityKw = 10.0;
+  solarTilt       = 30;
+  solarAzimuth    = 180;
+  solarEfficiency = 20;   // entered as %
+  solarLosses     = 14;   // entered as %
+
+  // ── Derived: price stats ─────────────────────────────────────────────────
   stats = computed<PriceStats | null>(() => {
     const pts = this.prices();
     if (!pts.length) return null;
@@ -47,6 +59,24 @@ export class DashboardComponent implements OnInit {
     };
   });
 
+  // ── Derived: solar stats ─────────────────────────────────────────────────
+  solarStats = computed(() => {
+    const pts = this.solarForecast();
+    if (!pts.length) return null;
+    const peakPower   = Math.max(...pts.map(p => p.inverterAcPower));
+    const totalEnergy = pts.reduce((s, p) => s + p.inverterAcPower * 0.25, 0);
+    return { peakPower, totalEnergy, count: pts.length };
+  });
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  ngOnInit(): void {
+    const { from, to } = this.initialDateRange();
+    this.fromDate = this.toInputValue(from);
+    this.toDate   = this.toInputValue(to);
+    this.fetch();
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
   fetch(): void {
     const from = new Date(this.fromDate);
     const to   = new Date(this.toDate);
@@ -54,17 +84,40 @@ export class DashboardComponent implements OnInit {
       this.error.set('Invalid date range.');
       return;
     }
+
     this.loading.set(true);
     this.error.set(null);
-    this.service.fetchDayAheadPrices(from, to).subscribe({
-      next:  (data) => { this.prices.set(data); this.loading.set(false); },
-      error: (err)  => {
+    this.solarError.set(null);
+
+    const priceReq = this.priceService.fetchDayAheadPrices(from, to);
+
+    const solarReq = this.solarService.fetchForecast({
+      lat:        this.solarLat,
+      lon:        this.solarLon,
+      capacityKw: this.solarCapacityKw,
+      tilt:       this.solarTilt,
+      azimuth:    this.solarAzimuth,
+      efficiency: this.solarEfficiency / 100,
+      losses:     this.solarLosses     / 100,
+    }).pipe(catchError(err => {
+      this.solarError.set(err?.message ?? 'Solar forecast unavailable — is the backend running?');
+      return of([] as SolarForecastPoint[]);
+    }));
+
+    forkJoin({ prices: priceReq, solar: solarReq }).subscribe({
+      next: ({ prices, solar }) => {
+        this.prices.set(prices);
+        this.solarForecast.set(solar);
+        this.loading.set(false);
+      },
+      error: (err) => {
         this.error.set(err.message ?? 'Failed to fetch prices. Is the backend running?');
         this.loading.set(false);
       }
     });
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   private initialDateRange(): { from: Date; to: Date } {
     const now = new Date();
     const offset = now.getUTCHours() >= 16 ? 1 : 0;

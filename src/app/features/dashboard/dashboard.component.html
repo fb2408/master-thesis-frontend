@@ -7,9 +7,9 @@
 
   <div class="page-content">
 
-    <!-- ── CONTROLS CARD ── -->
+    <!-- ── DATE RANGE CARD ── -->
     <div class="card controls-card">
-      <span class="card-label">Date Range</span>
+      <span class="card-label">Day-ahead Prices · Date Range</span>
       <div class="controls-row">
         <div class="controls-group">
           <label class="field-label">FROM</label>
@@ -27,18 +27,68 @@
       </div>
     </div>
 
-    <!-- ── ERROR ── -->
+    <!-- ── SOLAR FORECAST FORM CARD ── -->
+    <div class="card solar-form-card">
+      <span class="card-label">Solar Forecast · PV System Parameters</span>
+      <div class="solar-form-grid">
+
+        <div class="controls-group">
+          <label class="field-label">LAT</label>
+          <input class="num-input" type="number" step="0.0001" [(ngModel)]="solarLat" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">LON</label>
+          <input class="num-input" type="number" step="0.0001" [(ngModel)]="solarLon" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">CAPACITY <span class="unit-hint">kWp</span></label>
+          <input class="num-input" type="number" step="0.1" min="0.1" [(ngModel)]="solarCapacityKw" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">TILT <span class="unit-hint">°</span></label>
+          <input class="num-input" type="number" step="1" min="0" max="90" [(ngModel)]="solarTilt" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">AZIMUTH <span class="unit-hint">° (180=S)</span></label>
+          <input class="num-input" type="number" step="1" min="0" max="360" [(ngModel)]="solarAzimuth" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">EFFICIENCY <span class="unit-hint">%</span></label>
+          <input class="num-input" type="number" step="0.5" min="1" max="100" [(ngModel)]="solarEfficiency" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">LOSSES <span class="unit-hint">%</span></label>
+          <input class="num-input" type="number" step="0.5" min="0" max="100" [(ngModel)]="solarLosses" />
+        </div>
+
+      </div>
+      <div class="solar-form-hint">
+        Solar forecast calls
+        <code>POST /api/solar-forecast</code> → Open-Meteo · 3 days · 15-min intervals
+      </div>
+    </div>
+
+    <!-- ── ERRORS ── -->
     <div class="error-banner" *ngIf="error()">
       <span class="error-icon">✕</span> {{ error() }}
     </div>
+    <div class="error-banner error-banner--warn" *ngIf="solarError()">
+      <span class="error-icon">⚠</span> Solar: {{ solarError() }}
+    </div>
 
-    <!-- ── STAT CARDS ── -->
+    <!-- ── PRICE STAT CARDS ── -->
     <div class="stats-row" *ngIf="stats()">
 
       <div class="stat-card accent-amber">
         <div class="stat-icon">⚡</div>
         <div class="stat-body">
-          <div class="stat-label">Current</div>
+          <div class="stat-label">Current Price</div>
           <div class="stat-value">
             <span *ngIf="stats()!.current !== null">{{ stats()!.current!.toFixed(2) }}</span>
             <span *ngIf="stats()!.current === null" class="stat-na">N/A</span>
@@ -50,7 +100,7 @@
       <div class="stat-card accent-blue">
         <div class="stat-icon">≈</div>
         <div class="stat-body">
-          <div class="stat-label">Average</div>
+          <div class="stat-label">Average Price</div>
           <div class="stat-value">{{ stats()!.avg.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
         </div>
       </div>
@@ -58,7 +108,7 @@
       <div class="stat-card accent-green">
         <div class="stat-icon">↓</div>
         <div class="stat-body">
-          <div class="stat-label">Min</div>
+          <div class="stat-label">Min Price</div>
           <div class="stat-value">{{ stats()!.min.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
         </div>
       </div>
@@ -66,44 +116,74 @@
       <div class="stat-card accent-red">
         <div class="stat-icon">↑</div>
         <div class="stat-body">
-          <div class="stat-label">Max</div>
+          <div class="stat-label">Max Price</div>
           <div class="stat-value">{{ stats()!.max.toFixed(2) }} <span class="stat-unit">EUR/MWh</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── SOLAR STAT CARDS ── -->
+    <div class="stats-row" *ngIf="solarStats()">
+
+      <div class="stat-card accent-cyan">
+        <div class="stat-icon">☀</div>
+        <div class="stat-body">
+          <div class="stat-label">Peak AC Power</div>
+          <div class="stat-value">{{ solarStats()!.peakPower.toFixed(2) }} <span class="stat-unit">kW</span></div>
+        </div>
+      </div>
+
+      <div class="stat-card accent-cyan">
+        <div class="stat-icon">⬡</div>
+        <div class="stat-body">
+          <div class="stat-label">3-Day Energy</div>
+          <div class="stat-value">{{ solarStats()!.totalEnergy.toFixed(1) }} <span class="stat-unit">kWh</span></div>
         </div>
       </div>
 
       <div class="stat-card accent-cyan">
         <div class="stat-icon">#</div>
         <div class="stat-body">
-          <div class="stat-label">Data Points</div>
-          <div class="stat-value">{{ prices().length }} <span class="stat-unit">intervals</span></div>
+          <div class="stat-label">Solar Points</div>
+          <div class="stat-value">{{ solarStats()!.count }} <span class="stat-unit">× 15 min</span></div>
         </div>
       </div>
 
     </div>
 
-    <!-- ── CHART CARD ── -->
-    <div class="card chart-card" *ngIf="prices().length">
+    <!-- ── COMBINED CHART CARD ── -->
+    <div class="card chart-card" *ngIf="prices().length || solarForecast().length">
       <div class="chart-card-header">
-        <span class="chart-title">Day-Ahead Price Curve</span>
-        <span class="chart-resolution">{{ prices()[0]?.resolution }}</span>
+        <span class="chart-title">Solar Production &amp; Day-Ahead Prices</span>
+        <div class="chart-legend">
+          <span class="legend-item">
+            <span class="legend-dot legend-dot--cyan"></span>
+            <span class="legend-label">AC Power (kW) — left axis</span>
+          </span>
+          <span class="legend-item">
+            <span class="legend-dot legend-dot--amber"></span>
+            <span class="legend-label">Price (EUR/MWh) — right axis</span>
+          </span>
+        </div>
       </div>
-      <app-price-chart [prices]="prices()" />
+      <app-price-chart [prices]="prices()" [solarForecast]="solarForecast()" />
     </div>
 
     <!-- ── EMPTY STATE ── -->
-    <div class="empty-state" *ngIf="!prices().length && !loading() && !error()">
+    <div class="empty-state" *ngIf="!prices().length && !solarForecast().length && !loading() && !error()">
       <div class="empty-icon">◈</div>
-      <div class="empty-text">Select a date range and fetch prices</div>
-      <div class="empty-sub">Data sourced from ENTSO-E Transparency Platform</div>
+      <div class="empty-text">Configure parameters and fetch</div>
+      <div class="empty-sub">ENTSO-E day-ahead prices + Open-Meteo solar forecast on one chart</div>
     </div>
 
   </div>
 
   <!-- ── FOOTER ── -->
   <footer class="footer">
-    <span>Data · <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a></span>
+    <span>Prices · <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a></span>
+    <span>Solar · <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></span>
     <span>Resolution: PT15M / PT60M</span>
-    <span>Currency: EUR/MWh</span>
   </footer>
 
 </div>
