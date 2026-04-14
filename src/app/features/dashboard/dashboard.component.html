@@ -44,7 +44,7 @@
 
         <div class="controls-group">
           <label class="field-label">CAPACITY <span class="unit-hint">kWp</span></label>
-          <input class="num-input" type="number" step="0.1" min="0.1" [(ngModel)]="solarCapacityKw" />
+          <input class="num-input" type="number" step="0.1" min="0.1" [(ngModel)]="solarCapacityKw" (change)="fetchSolar()" />
         </div>
 
         <div class="controls-group">
@@ -70,7 +70,7 @@
       </div>
       <div class="solar-form-hint">
         Solar forecast calls
-        <code>POST /api/solar-forecast</code> → Open-Meteo · 3 days · 15-min intervals
+        <code>POST /api/solar-forecast</code> → Open-Meteo · day-ahead · 96 × 15-min intervals
       </div>
     </div>
 
@@ -167,8 +167,114 @@
           </span>
         </div>
       </div>
-      <app-price-chart [prices]="prices()" [solarForecast]="solarForecast()" />
+      <app-price-chart [data]="chartData()" [options]="chartOptions" />
     </div>
+
+    <!-- ── BATTERY OPTIMIZATION FORM ── -->
+    <div class="card battery-form-card" *ngIf="prices().length && solarForecast().length">
+      <span class="card-label">Battery Optimization · DA Schedule</span>
+
+      <div class="battery-form-grid">
+
+        <div class="controls-group controls-group--full">
+          <label class="field-label">TARIFF MODEL</label>
+          <select class="select-input" [(ngModel)]="batteryTariff">
+            <option *ngFor="let t of tariffModels" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">BATTERY POWER <span class="unit-hint">kW</span></label>
+          <input class="num-input" type="number" step="1" min="1" [(ngModel)]="batteryPowerKw" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">CAPACITY <span class="unit-hint">kWh</span></label>
+          <input class="num-input" type="number" step="1" min="1" [(ngModel)]="batteryCapacityKwh" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">INITIAL SOC <span class="unit-hint">kWh</span></label>
+          <input class="num-input" type="number" step="0.5" min="0" [(ngModel)]="batteryInitSocKwh" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">IMPORT LIMIT <span class="unit-hint">kW</span></label>
+          <input class="num-input" type="number" step="1" min="1" [(ngModel)]="gridImportKw" />
+        </div>
+
+        <div class="controls-group">
+          <label class="field-label">EXPORT LIMIT <span class="unit-hint">kW</span></label>
+          <input class="num-input" type="number" step="1" min="0" [(ngModel)]="gridExportKw" />
+        </div>
+
+      </div>
+
+      <div class="battery-form-actions">
+        <button class="fetch-btn fetch-btn--green" (click)="optimizeBattery()" [disabled]="batteryLoading()">
+          <span *ngIf="!batteryLoading()">Optimize</span>
+          <span *ngIf="batteryLoading()" class="loading-text">Solving<span class="dots">...</span></span>
+        </button>
+        <span class="battery-form-hint">
+          Calls <code>POST /api/battery-optimization</code> → HiGHS LP solver · HEP ODS tariff
+        </span>
+      </div>
+    </div>
+
+    <!-- ── BATTERY ERROR ── -->
+    <div class="error-banner error-banner--warn" *ngIf="batteryError()">
+      <span class="error-icon">⚠</span> Battery: {{ batteryError() }}
+    </div>
+
+    <!-- ── BATTERY RESULT ── -->
+    <ng-container *ngIf="batteryResult() as result">
+
+      <!-- Battery schedule chart -->
+      <div class="card chart-card">
+        <div class="chart-card-header">
+          <span class="chart-title">Battery Schedule · Grid &amp; Battery Flow</span>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#d4870a"></span><span class="legend-label">Import</span></span>
+            <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span><span class="legend-label">Export</span></span>
+            <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span><span class="legend-label">Charge</span></span>
+            <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span><span class="legend-label">Discharge</span></span>
+          </div>
+        </div>
+        <app-battery-chart [data]="batteryChartData()" [options]="batteryChartOptions" />
+      </div>
+
+      <!-- Schedule table -->
+      <div class="card schedule-card">
+        <div class="schedule-header">
+          <span class="card-label">Battery Schedule · 15-min intervals</span>
+        </div>
+        <div class="schedule-table-wrap">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>TIME</th>
+                <th>IMPORT kWh</th>
+                <th>EXPORT kWh</th>
+                <th>CHARGE kWh</th>
+                <th>DISCHARGE kWh</th>
+                <th>SOC kWh</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of result.schedule">
+                <td class="ts-cell">{{ row.ts * 1000 | date:'dd.MM HH:mm' }}</td>
+                <td [class.cell-positive]="row.values['p_import_kwh'] > 0">{{ row.values['p_import_kwh'].toFixed(3) }}</td>
+                <td [class.cell-positive]="row.values['p_export_kwh'] > 0">{{ row.values['p_export_kwh'].toFixed(3) }}</td>
+                <td [class.cell-positive]="row.values['p_charge_kwh'] > 0">{{ row.values['p_charge_kwh'].toFixed(3) }}</td>
+                <td [class.cell-positive]="row.values['p_discharge_kwh'] > 0">{{ row.values['p_discharge_kwh'].toFixed(3) }}</td>
+                <td class="soc-cell">{{ row.values['soc_kwh'].toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </ng-container>
 
     <!-- ── EMPTY STATE ── -->
     <div class="empty-state" *ngIf="!prices().length && !solarForecast().length && !loading() && !error()">
@@ -183,7 +289,7 @@
   <footer class="footer">
     <span>Prices · <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a></span>
     <span>Solar · <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></span>
-    <span>Resolution: PT15M / PT60M</span>
+    <span>Solar: 96 × PT15M · Prices: PT60M</span>
   </footer>
 
 </div>
